@@ -51,8 +51,14 @@ function attachOneLineComment<T extends ts.Node>(node: T, text: string): T {
     return ts.addSyntheticLeadingComment(node, ts.SyntaxKind.MultiLineCommentTrivia, ` ${text} `);
 }
 
+/**
+ * Application command options that are not subcommands or subcommand groups.
+ */
 export type Option = ApplicationCommandAttachmentOptionResponse | ApplicationCommandBooleanOptionResponse | ApplicationCommandChannelOptionResponse | ApplicationCommandIntegerOptionResponse | ApplicationCommandMentionableOptionResponse | ApplicationCommandNumberOptionResponse | ApplicationCommandRoleOptionResponse | ApplicationCommandStringOptionResponse | ApplicationCommandUserOptionResponse;
 
+/**
+ * Group application commands by type.
+ */
 export type Group = {
     [Type in ApplicationCommandType]: ApplicationCommandResponse[];
 }
@@ -133,6 +139,12 @@ const numberKeywordType = createKeywordTypeNode(SyntaxKind.NumberKeyword);
 
 const exportModifier = createModifier(ts.SyntaxKind.ExportKeyword);
 
+/**
+ * Creates the corresponding type for a given option.
+ *
+ * @param option The option.
+ * @param resolved Whether the option should be resolved (slash command) or not (autocomplete).
+ */
 export function createOptionType(option: Option, resolved: boolean = false): ts.TypeNode {
     switch (option.type) {
         case ApplicationCommandOptionType.STRING:
@@ -156,6 +168,11 @@ export function createOptionType(option: Option, resolved: boolean = false): ts.
     }
 }
 
+/**
+ * Creates the corresponding interaction type of a command based on its supported contexts.
+ *
+ * @param command The command.
+ */
 export function createInteractionType(command: ApplicationCommandResponse): ts.TypeNode {
     const contexts = command.guild_id ? [InteractionContextType.GUILD] : command.contexts ?? [InteractionContextType.GUILD, InteractionContextType.BOT_DM, InteractionContextType.PRIVATE_CHANNEL];
     const base = interactionsTypes.import("BaseInteraction");
@@ -173,6 +190,12 @@ export function createInteractionType(command: ApplicationCommandResponse): ts.T
     return createIntersectionTypeNode([base, contextType]);
 }
 
+/**
+ * Creates a handler type for a slash command.
+ *
+ * @param interactionType The type of the interaction.
+ * @param options The options.
+ */
 export function createSlashCommandHandler(interactionType: ts.TypeNode, options: Option[]): ts.FunctionTypeNode {
     const members = options.map(option => attachJSDoc(createPropertySignature([], getValidName(option.name), option.required ? undefined : createToken(ts.SyntaxKind.QuestionToken), createOptionType(option, true)), option.description));
     const optionsType = createTypeLiteralNode(members);
@@ -180,6 +203,12 @@ export function createSlashCommandHandler(interactionType: ts.TypeNode, options:
     return createFunctionTypeNode(undefined, [createParameterDeclaration([], undefined, "options", undefined, optionsType), createParameterDeclaration([], undefined, "interaction", undefined, interactionType)], router.import("ApplicationCommandResponse"));
 }
 
+/**
+ * Creates a handler type for a slash command autocomplete.
+ *
+ * @param interactionType The type of the interaction.
+ * @param options The options.
+ */
 export function createSlashCommandAutocompleteHandler(interactionType: ts.TypeNode, options: Option[]): ts.TypeLiteralNode {
     const autocompleteOptions = options.filter(option => "autocomplete" in option && option.autocomplete);
 
@@ -209,6 +238,13 @@ export function createSlashCommandAutocompleteHandler(interactionType: ts.TypeNo
     return autocompleteHandlerType;
 }
 
+/**
+ * Creates a handler type for a slash command, where subcommands and subcommand groups are represented as nested properties.
+ *
+ * @param createSlashCommandHandler The function used to create the handler type for a slash command.
+ * @param interactionType The type of the interaction.
+ * @param options The options, which may include subcommands and subcommand groups.
+ */
 export function createSlashCommandHandlerMapRec(createSlashCommandHandler: (interactionType: ts.TypeNode, options: Option[]) => ts.TypeNode, interactionType: ts.TypeNode, options: ApplicationCommandResponse["options"] = []): ts.TypeNode {
     const commands = options.filter(option => option.type === ApplicationCommandOptionType.SUB_COMMAND || option.type === ApplicationCommandOptionType.SUB_COMMAND_GROUP);
 
@@ -222,8 +258,14 @@ export function createSlashCommandHandlerMapRec(createSlashCommandHandler: (inte
     }
 }
 
-export function createSlashCommandHandlerMap(createSlashCommandHandler: (interactionType: ts.TypeNode, options: Option[]) => ts.TypeNode, chat_input_commands: ApplicationCommandResponse[]) {
-    const members = chat_input_commands.map(command => {
+/**
+ * Creates a type literal mapping slash command names to their handler types.
+ *
+ * @param createSlashCommandHandler The function used to create the handler type for a slash command.
+ * @param commands The slash commands.
+ */
+export function createSlashCommandHandlerMap(createSlashCommandHandler: (interactionType: ts.TypeNode, options: Option[]) => ts.TypeNode, commands: ApplicationCommandResponse[]) {
+    const members = commands.map(command => {
         const signature = createPropertySignature(undefined, getValidName(command.name), undefined, createSlashCommandHandlerMapRec(createSlashCommandHandler, createInteractionType(command), command.options));
         return attachJSDoc(signature, command.description);
     });
@@ -231,6 +273,11 @@ export function createSlashCommandHandlerMap(createSlashCommandHandler: (interac
     return createTypeLiteralNode(members);
 }
 
+/**
+ * Creates a type literal mapping user command names to their handler types.
+ *
+ * @param commands The user commands.
+ */
 export function createUserCommandHandlerMap(commands: ApplicationCommandResponse[]) {
     const members = commands.map(command => {
         const parameters = [createParameterDeclaration([], undefined, "user", undefined, createUnionTypeNode([interactionsTypes.import("Member"), interactionsTypes.import("User")])), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
@@ -242,6 +289,11 @@ export function createUserCommandHandlerMap(commands: ApplicationCommandResponse
     return createTypeLiteralNode(members);
 }
 
+/**
+ * Creates a type literal mapping message command names to their handler types.
+ *
+ * @param commands The message commands.
+ */
 export function createMessageCommandHandlerMap(commands: ApplicationCommandResponse[]) {
     const members = commands.map(command => {
         const parameters = [createParameterDeclaration([], undefined, "message", undefined, interactionsTypes.import("PartialMessage")), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
@@ -253,6 +305,13 @@ export function createMessageCommandHandlerMap(commands: ApplicationCommandRespo
     return createTypeLiteralNode(members);
 }
 
+/**
+ * Creates a type literal mapping guild identifiers to their respective command handlers.
+ *
+ * @param guilds The guilds and their commands.
+ * @param type The application command type to generate handlers for.
+ * @param createCommandHandlersType The function used to create the dispatcher type for a list of commands.
+ */
 export function createGuildCommandHandlerMap(guilds: Map<SnowflakeType, Group>, type: ApplicationCommandType, createCommandHandlersType: (commands: ApplicationCommandResponse[]) => ts.TypeNode) {
     const members = [...guilds.entries()].map(([guild_id, { [type]: commands }]) => {
         return createPropertySignature(undefined, getValidName(guild_id), undefined, createCommandHandlersType(commands));
@@ -261,6 +320,11 @@ export function createGuildCommandHandlerMap(guilds: Map<SnowflakeType, Group>, 
     return createTypeLiteralNode(members);
 }
 
+/**
+ * Creates the dispatcher source file from the provided application commands.
+ *
+ * @param commands The (global or guild) application commands used to generate the dispatchers.
+ */
 export function createDispatchersSourceFile(commands: ApplicationCommandResponse[]): ts.SourceFile {
     const global = createGroup();
     const guilds = new Map<SnowflakeType, Group>();
@@ -365,6 +429,12 @@ export function createGuildAutocompleteCommandDispatcher(onGuildAutocomplete: Gu
 }
 `
 
+/**
+ * Creates and writes the dispatcher source file from the provided application commands.
+ *
+ * @param path The output path where the generated source file should be written.
+ * @param commands The (global or guild) application commands used to generate the dispatchers.
+ */
 export function createAndPrintDispatchersSourceFile(path: string, commands: ApplicationCommandResponse[]) {
     const sourceFile = createDispatchersSourceFile(commands);
     const printer = ts.createPrinter({ newLine: ts.NewLineKind.LineFeed });
