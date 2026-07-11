@@ -1,0 +1,51 @@
+{
+  "name": "@typed-discord/interactions-codegen",
+  "version": "0.0.1",
+  "description": "Generates strongly typed dispatchers from your bot's commands for use with @typed-discord/interactions.",
+  "bin": "./bin/cli.mjs",
+  "exports": {
+    ".": {
+      "import": "./src/index.mjs",
+      "types": "./src/index.d.mts"
+    }
+  },
+  "scripts": {
+    "build:src": "cd src && tsc",
+    "build:bin": "cd bin && tsc",
+    "build": "npm run build:src && npm run build:bin",
+    "prepack": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typed-discord/interactions-codegen.git"
+  },
+  "keywords": [
+    "typescript",
+    "discord",
+    "interactions",
+    "code",
+    "generator"
+  ],
+  "author": "Adrien Simonnet",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/typed-discord/interactions-codegen/issues"
+  },
+  "homepage": "https://typed-discord.github.io/interactions-codegen",
+  "devDependencies": {
+    "@types/node": "^25.9.1"
+  },
+  "dependencies": {
+    "commander": "14.0.2",
+    "@typed-discord/rest": "0.0.2",
+    "typescript": "6.0.3"
+  },
+  "type": "module",
+  "files": [
+    "src/index.mjs",
+    "src/index.d.mts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

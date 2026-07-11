@@ -1,0 +1,6 @@
+node_modules/
+docs/
+*.mjs
+*.mjs.map
+*.d.mts
+*.d.mts.map
