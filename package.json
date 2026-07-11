@@ -13,6 +13,7 @@
     "build:src": "cd src && tsc",
     "build:bin": "cd bin && tsc",
     "build": "npm run build:src && npm run build:bin",
+    "doc": "typedoc --out docs",
     "prepack": "npm run build"
   },
   "repository": {
@@ -33,11 +34,12 @@
   },
   "homepage": "https://typed-discord.github.io/interactions-codegen",
   "devDependencies": {
-    "@types/node": "^25.9.1"
+    "@types/node": "^25.9.1",
+    "typedoc": "^0.28.20"
   },
   "dependencies": {
-    "commander": "14.0.2",
     "@typed-discord/rest": "0.0.2",
+    "commander": "14.0.2",
     "typescript": "6.0.3"
   },
   "type": "module",
