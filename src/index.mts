@@ -131,8 +131,7 @@ class ModuleImportManager {
 }
 
 const router = new ModuleImportManager("Router");
-const restTypes = new ModuleImportManager("RestTypes");
-const interactionsTypes = new ModuleImportManager("Types");
+const restTypes = new ModuleImportManager("Types");
 
 const stringKeywordType = createKeywordTypeNode(SyntaxKind.StringKeyword);
 const numberKeywordType = createKeywordTypeNode(SyntaxKind.NumberKeyword);
@@ -154,17 +153,17 @@ export function createOptionType(option: Option, resolved: boolean = false): ts.
         case ApplicationCommandOptionType.BOOLEAN:
             return createKeywordTypeNode(SyntaxKind.BooleanKeyword);
         case ApplicationCommandOptionType.USER:
-            return resolved ? createUnionTypeNode([interactionsTypes.import("User"), interactionsTypes.import("Member")]) : restTypes.import("SnowflakeType");
+            return resolved ? createUnionTypeNode([restTypes.import("UserResponse"), restTypes.import("GuildMemberResponse")]) : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.CHANNEL:
-            return resolved ? interactionsTypes.import("PartialChannel") : restTypes.import("SnowflakeType");
+            return resolved ? restTypes.import("ChannelResponse") : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.ROLE:
-            return resolved ? interactionsTypes.import("Role") : restTypes.import("SnowflakeType");
+            return resolved ? restTypes.import("RoleResponse") : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.MENTIONABLE:
-            return resolved ? createUnionTypeNode([interactionsTypes.import("User"), interactionsTypes.import("Member"), interactionsTypes.import("Role")]) : restTypes.import("SnowflakeType");
+            return resolved ? createUnionTypeNode([restTypes.import("UserResponse"), restTypes.import("GuildMemberResponse"), restTypes.import("RoleResponse")]) : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.NUMBER:
             return option.choices ? createUnionTypeNode(option.choices.map(choice => attachOneLineComment(createLiteralTypeNode(createNumericLiteral(choice.value)), choice.name))) : numberKeywordType;
         case ApplicationCommandOptionType.ATTACHMENT:
-            return resolved ? interactionsTypes.import("Attachment") : restTypes.import("SnowflakeType");
+            return resolved ? restTypes.import("AttachmentResponse") : restTypes.import("SnowflakeType");
     }
 }
 
@@ -175,15 +174,15 @@ export function createOptionType(option: Option, resolved: boolean = false): ts.
  */
 export function createInteractionType(command: ApplicationCommandResponse): ts.TypeNode {
     const contexts = command.guild_id ? [InteractionContextType.GUILD] : command.contexts ?? [InteractionContextType.GUILD, InteractionContextType.BOT_DM, InteractionContextType.PRIVATE_CHANNEL];
-    const base = interactionsTypes.import("BaseInteraction");
+    const base = restTypes.import("BaseInteraction");
     const contextType = createUnionTypeNode(contexts.map(context => {
         switch (context) {
             case InteractionContextType.GUILD:
-                return interactionsTypes.import("GuildInteraction");
+                return restTypes.import("GuildInteraction");
             case InteractionContextType.BOT_DM:
-                return interactionsTypes.import("BotDirectMessageInteraction");
+                return restTypes.import("BotDirectMessageInteraction");
             case InteractionContextType.PRIVATE_CHANNEL:
-                return interactionsTypes.import("PrivateMessageInteraction");
+                return restTypes.import("PrivateMessageInteraction");
         }
     }));
 
@@ -280,7 +279,7 @@ export function createSlashCommandHandlerMap(createSlashCommandHandler: (interac
  */
 export function createUserCommandHandlerMap(commands: ApplicationCommandResponse[]) {
     const members = commands.map(command => {
-        const parameters = [createParameterDeclaration([], undefined, "user", undefined, createUnionTypeNode([interactionsTypes.import("Member"), interactionsTypes.import("User")])), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
+        const parameters = [createParameterDeclaration([], undefined, "user", undefined, createUnionTypeNode([restTypes.import("GuildMemberResponse"), restTypes.import("UserResponse")])), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
         const method = createMethodSignature(undefined, getValidName(command.name), undefined, undefined, parameters, router.import("ApplicationCommandResponse"));
 
         return method;
@@ -296,7 +295,7 @@ export function createUserCommandHandlerMap(commands: ApplicationCommandResponse
  */
 export function createMessageCommandHandlerMap(commands: ApplicationCommandResponse[]) {
     const members = commands.map(command => {
-        const parameters = [createParameterDeclaration([], undefined, "message", undefined, interactionsTypes.import("PartialMessage")), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
+        const parameters = [createParameterDeclaration([], undefined, "message", undefined, restTypes.import("MessageResponse")), createParameterDeclaration([], undefined, "interaction", undefined, createInteractionType(command))];
         const method = createMethodSignature(undefined, getValidName(command.name), undefined, undefined, parameters, router.import("ApplicationCommandResponse"));
 
         return method;
@@ -313,8 +312,8 @@ export function createMessageCommandHandlerMap(commands: ApplicationCommandRespo
  * @param createCommandHandlersType The function used to create the dispatcher type for a list of commands.
  */
 export function createGuildCommandHandlerMap(guilds: Map<SnowflakeType, Group>, type: ApplicationCommandType, createCommandHandlersType: (commands: ApplicationCommandResponse[]) => ts.TypeNode) {
-    const members = [...guilds.entries()].map(([guild_id, { [type]: commands }]) => {
-        return createPropertySignature(undefined, getValidName(guild_id), undefined, createCommandHandlersType(commands));
+    const members = [...guilds.entries()].map(([guildId, { [type]: commands }]) => {
+        return createPropertySignature(undefined, getValidName(guildId), undefined, createCommandHandlersType(commands));
     });
 
     return createTypeLiteralNode(members);
@@ -359,11 +358,10 @@ export function createDispatchersSourceFile(commands: ApplicationCommandResponse
     const guildMessageCommands = createTypeAliasDeclaration(modifiers, "GuildMessageCommands", [], createGuildCommandHandlerMap(guilds, ApplicationCommandType.MESSAGE, createMessageCommandHandlerMap));
     const guildSlashCommandsAutocomplete = createTypeAliasDeclaration(modifiers, "GuildSlashCommandsAutocomplete", [], createGuildCommandHandlerMap(guilds, ApplicationCommandType.CHAT, commands => createSlashCommandHandlerMap(createSlashCommandAutocompleteHandler, commands)));
 
-    const restTypesImport = restTypes.toImportDeclaration("@typed-discord/rest/types", true);
+    const restTypesImport = restTypes.toImportDeclaration("@typed-discord/rest/types", false);
     const routerTypesImport = router.toImportDeclaration("@typed-discord/interactions/router", true);
-    const interactionsTypesImport = interactionsTypes.toImportDeclaration("@typed-discord/interactions/types", true);
 
-    return createSourceFile([restTypesImport, routerTypesImport, interactionsTypesImport, globalSlashCommands, globalUserCommands, globalMessageCommands, globalSlashCommandsAutocomplete, guildSlashCommands, guildUserCommands, guildMessageCommands, guildSlashCommandsAutocomplete], createToken(ts.SyntaxKind.EndOfFileToken), ts.NodeFlags.None);
+    return createSourceFile([restTypesImport, routerTypesImport, globalSlashCommands, globalUserCommands, globalMessageCommands, globalSlashCommandsAutocomplete, guildSlashCommands, guildUserCommands, guildMessageCommands, guildSlashCommandsAutocomplete], createToken(ts.SyntaxKind.EndOfFileToken), ts.NodeFlags.None);
 }
 
 const staticCode = `
@@ -401,7 +399,7 @@ export function createGlobalSlashCommandDispatcher(onGlobalSlashCommand: GlobalS
 }
 
 export function createGuildSlashCommandDispatcher(onGlobalSlashCommand: GuildSlashCommands): Router.Handlers["onGuildSlashCommand"] {
-   return (guild_id, name, options, interaction) => callHandler(onGlobalSlashCommand as unknown as DispatchMap<[typeof options, typeof interaction], ReturnType<Router.Handlers["onGuildSlashCommand"]>>, [guild_id, ...name.split(" ")], options, interaction);
+   return (guildId, name, options, interaction) => callHandler(onGlobalSlashCommand as unknown as DispatchMap<[typeof options, typeof interaction], ReturnType<Router.Handlers["onGuildSlashCommand"]>>, [guildId, ...name.split(" ")], options, interaction);
 }
 
 export function createGlobalUserCommandDispatcher(onGlobalUserCommand: GlobalUserCommands): Router.Handlers["onGlobalUserCommand"] {
@@ -409,7 +407,7 @@ export function createGlobalUserCommandDispatcher(onGlobalUserCommand: GlobalUse
 }
 
 export function createGuildUserCommandDispatcher(onGuildUserCommand: GuildUserCommands): Router.Handlers["onGuildUserCommand"] {
-   return (guild_id, name, member_or_user, interaction) => callHandler(onGuildUserCommand as unknown as DispatchMap<[typeof member_or_user, typeof interaction], ReturnType<Router.Handlers["onGuildUserCommand"]>>, [guild_id, name], member_or_user, interaction);
+   return (guildId, name, member_or_user, interaction) => callHandler(onGuildUserCommand as unknown as DispatchMap<[typeof member_or_user, typeof interaction], ReturnType<Router.Handlers["onGuildUserCommand"]>>, [guildId, name], member_or_user, interaction);
 }
 
 export function createGlobalMessageCommandDispatcher(onGlobalMessageCommand: GlobalMessageCommands): Router.Handlers["onGlobalMessageCommand"] {
@@ -417,15 +415,33 @@ export function createGlobalMessageCommandDispatcher(onGlobalMessageCommand: Glo
 }
 
 export function createGuildMessageCommandDispatcher(onGuildMessageCommand: GuildMessageCommands): Router.Handlers["onGuildMessageCommand"] {
-   return (guild_id, name, message, interaction) => callHandler(onGuildMessageCommand as unknown as DispatchMap<[typeof message, typeof interaction], ReturnType<Router.Handlers["onGuildMessageCommand"]>>, [guild_id, name], message, interaction);
+   return (guildId, name, message, interaction) => callHandler(onGuildMessageCommand as unknown as DispatchMap<[typeof message, typeof interaction], ReturnType<Router.Handlers["onGuildMessageCommand"]>>, [guildId, name], message, interaction);
 }
 
 export function createGlobalAutocompleteCommandDispatcher(onGlobalAutocomplete: GlobalSlashCommandsAutocomplete): Router.Handlers["onGlobalAutocomplete"] {
-   return (name, focusedOptionName, focusedOptionValue, notFocusedOptions, interaction) => callHandler(onGlobalAutocomplete as unknown as DispatchMap<[typeof focusedOptionValue, typeof notFocusedOptions, typeof interaction], ReturnType<Router.Handlers["onGlobalAutocomplete"]>>, [...name.split(" "), focusedOptionName], focusedOptionValue, notFocusedOptions, interaction);
+    return async (name, focusedOptionName, focusedOptionValue, notFocusedOptions, interaction) => {
+        const choices = await callHandler(onGlobalAutocomplete as unknown as DispatchMap<[typeof focusedOptionValue, typeof notFocusedOptions, typeof interaction], Router.MayBePromise<{ name: string, value: string | number }[]>>, [...name.split(" "), focusedOptionName], focusedOptionValue, notFocusedOptions, interaction);
+
+        return {
+            type: Types.InteractionCallbackTypes.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+            data: {
+                choices
+            } as Types.InteractionApplicationCommandAutocompleteCallbackIntegerData | Types.InteractionApplicationCommandAutocompleteCallbackNumberData | Types.InteractionApplicationCommandAutocompleteCallbackStringData
+        }
+    }
 }
    
 export function createGuildAutocompleteCommandDispatcher(onGuildAutocomplete: GuildSlashCommandsAutocomplete): Router.Handlers["onGuildAutocomplete"] {
-   return (guild_id, name, focusedOptionName, focusedOptionValue, notFocusedOptions, interaction) => callHandler(onGuildAutocomplete as unknown as DispatchMap<[typeof focusedOptionValue, typeof notFocusedOptions, typeof interaction], ReturnType<Router.Handlers["onGuildAutocomplete"]>>, [guild_id, ...name.split(" "), focusedOptionName], focusedOptionValue, notFocusedOptions, interaction);
+    return async (guildId, name, focusedOptionName, focusedOptionValue, notFocusedOptions, interaction) => {
+        const choices = await callHandler(onGuildAutocomplete as unknown as DispatchMap<[typeof focusedOptionValue, typeof notFocusedOptions, typeof interaction], Router.MayBePromise<{ name: string, value: string | number }[]>>, [guildId, ...name.split(" "), focusedOptionName], focusedOptionValue, notFocusedOptions, interaction);
+
+        return {
+            type: Types.InteractionCallbackTypes.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+            data: {
+                choices
+            } as Types.InteractionApplicationCommandAutocompleteCallbackIntegerData | Types.InteractionApplicationCommandAutocompleteCallbackNumberData | Types.InteractionApplicationCommandAutocompleteCallbackStringData
+        }
+    }
 }
 `
 
