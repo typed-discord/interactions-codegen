@@ -1,6 +1,6 @@
 {
   "name": "@typed-discord/interactions-codegen",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Generates strongly typed dispatchers from your bot's commands for use with @typed-discord/interactions.",
   "bin": "./bin/cli.mjs",
   "exports": {

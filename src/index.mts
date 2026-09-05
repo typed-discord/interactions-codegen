@@ -155,11 +155,11 @@ export function createOptionType(option: Option, resolved: boolean = false): ts.
         case ApplicationCommandOptionType.USER:
             return resolved ? createUnionTypeNode([restTypes.import("UserResponse"), restTypes.import("GuildMemberResponse")]) : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.CHANNEL:
-            return resolved ? restTypes.import("ChannelResponse") : restTypes.import("SnowflakeType");
+            return resolved ? restTypes.import("GuildChannelResponse") : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.ROLE:
-            return resolved ? restTypes.import("RoleResponse") : restTypes.import("SnowflakeType");
+            return resolved ? restTypes.import("GuildRoleResponse") : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.MENTIONABLE:
-            return resolved ? createUnionTypeNode([restTypes.import("UserResponse"), restTypes.import("GuildMemberResponse"), restTypes.import("RoleResponse")]) : restTypes.import("SnowflakeType");
+            return resolved ? createUnionTypeNode([restTypes.import("UserResponse"), restTypes.import("GuildMemberResponse"), restTypes.import("GuildRoleResponse")]) : restTypes.import("SnowflakeType");
         case ApplicationCommandOptionType.NUMBER:
             return option.choices ? createUnionTypeNode(option.choices.map(choice => attachOneLineComment(createLiteralTypeNode(createNumericLiteral(choice.value)), choice.name))) : numberKeywordType;
         case ApplicationCommandOptionType.ATTACHMENT:
