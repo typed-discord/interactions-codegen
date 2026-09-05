@@ -38,7 +38,7 @@
     "typedoc": "^0.28.20"
   },
   "dependencies": {
-    "@typed-discord/rest": "0.0.2",
+    "@typed-discord/rest": "0.0.5",
     "commander": "14.0.2",
     "typescript": "6.0.3"
   },

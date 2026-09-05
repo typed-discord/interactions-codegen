@@ -173,7 +173,7 @@ export function createOptionType(option: Option, resolved: boolean = false): ts.
  * @param command The command.
  */
 export function createInteractionType(command: ApplicationCommandResponse): ts.TypeNode {
-    const contexts = command.guild_id ? [InteractionContextType.GUILD] : command.contexts ?? [InteractionContextType.GUILD, InteractionContextType.BOT_DM, InteractionContextType.PRIVATE_CHANNEL];
+    const contexts = command.guildId ? [InteractionContextType.GUILD] : command.contexts ? [...command.contexts] : [InteractionContextType.GUILD, InteractionContextType.BOT_DM, InteractionContextType.PRIVATE_CHANNEL];
     const base = restTypes.import("BaseInteraction");
     const contextType = createUnionTypeNode(contexts.map(context => {
         switch (context) {
@@ -331,12 +331,12 @@ export function createDispatchersSourceFile(commands: ApplicationCommandResponse
     for (const command of commands) {
         let guild;
 
-        if (command.guild_id) {
-            guild = guilds.get(command.guild_id);
+        if (command.guildId) {
+            guild = guilds.get(command.guildId);
 
             if (!guild) {
                 guild = createGroup();
-                guilds.set(command.guild_id, guild);
+                guilds.set(command.guildId, guild);
             }
         }
         else {
